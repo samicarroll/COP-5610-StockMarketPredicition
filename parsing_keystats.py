@@ -6,15 +6,9 @@ from datetime import datetime
 from utils import data_string_to_float
 from tqdm import tqdm
 
-# ---------------------------------------------------- #
-# TODO: FIX BUILD ERRORS (python3 parsing_keystats.py)
-# IndexError: index 0 is out of bounds for axis 0 with size 0
-# NOTE:
-# 
-# ---------------------------------------------------- #
 
 # The directory where individual html files are stored
-statspath = "/Users/samicarroll/Documents/projects/CAP 5610/Stock Prediction/intraQuarter"
+statspath = "intraQuarter/_KeyStats/"
 
 # The list of features to parse from the html files
 features = [  # Valuation measures
@@ -91,7 +85,19 @@ def preprocess_price_data():
     return sp500_raw_data, stock_raw_data
 
 
-def parse_keystats(sp500_df, stock_df):
+# Define df_columns
+df_columns = [
+    "Date",
+    "Unix",
+    "Ticker",
+    "Price",
+    "stock_p_change",
+    "SP500",
+    "SP500_p_change",
+] + features
+
+
+def parse_keystats(sp500_df, stock_df, df_columns):
     """
     We have downloaded a large number of html files, which are snapshots of a ticker at different times,
     containing the fundamental data (our features). To extract the key statistics, we use regex.
@@ -105,18 +111,8 @@ def parse_keystats(sp500_df, stock_df):
     stock_list = [x[0] for x in os.walk(statspath)]
     stock_list = stock_list[1:]
 
-    # Creating a new dataframe which we will later fill.
-    df_columns = [
-        "Date",
-        "Unix",
-        "Ticker",
-        "Price",
-        "stock_p_change",
-        "SP500",
-        "SP500_p_change",
-    ] + features
-
-    df = pd.DataFrame(columns=df_columns)
+    # Creating a list to store dictionaries
+    data_list = []
 
     # tqdm is a simple progress bar
     for stock_directory in tqdm(stock_list, desc="Parsing progress:", unit="tickers"):
@@ -160,6 +156,7 @@ def parse_keystats(sp500_df, stock_df):
                         value_list.append(data_string_to_float(value))
 
                     # The data may not be present. Process accordingly
+                    # The data may not be present. Process accordingly
                     except AttributeError:
                         # In the past, 'Avg Vol' was instead named 'Average Volume'
                         # If 'Avg Vol' fails, search for 'Average Volume'.
@@ -171,12 +168,12 @@ def parse_keystats(sp500_df, stock_df):
                                     + r".*?(\-?\d+\.*\d*K?M?B?|N/A[\\n|\s]*|>0)%?"
                                     r"(</td>|</span>)"
                                 )
-                                value = re.search(regex, source, flags=re.DOTALL).group(
-                                    1
-                                )
+                                value = re.search(regex, source, flags=re.DOTALL).group(1)
                                 value_list.append(data_string_to_float(value))
                             except AttributeError:
                                 value_list.append("N/A")
+                            # Skip to the next iteration of the loop if the date is not found
+                            continue
                         else:
                             value_list.append("N/A")
 
@@ -209,18 +206,22 @@ def parse_keystats(sp500_df, stock_df):
                 ((stock_1y_price - stock_price) / stock_price * 100), 2
             )
 
-            # Append all our data to the dataframe.
-            new_df_row = [
-                date_stamp,
-                unix_time,
-                ticker,
-                stock_price,
-                stock_p_change,
-                sp500_price,
-                sp500_p_change,
-            ] + value_list
+            # Append all our data to the data list.
+            new_df_row = {
+                "Date": date_stamp,
+                "Unix": unix_time,
+                "Ticker": ticker,
+                "Price": stock_price,
+                "stock_p_change": stock_p_change,
+                "SP500": sp500_price,
+                "SP500_p_change": sp500_p_change,
+            }
+            new_df_row.update(zip(features, value_list))
 
-            df = df.append(dict(zip(df_columns, new_df_row)), ignore_index=True)
+            data_list.append(new_df_row)
+
+    # Create DataFrame from data list
+    df = pd.DataFrame(data_list, columns=df_columns)
 
     # Remove rows with missing stock price data
     df.dropna(axis=0, subset=["Price", "stock_p_change"], inplace=True)
@@ -230,4 +231,4 @@ def parse_keystats(sp500_df, stock_df):
 
 if __name__ == "__main__":
     sp500_df, stock_df = preprocess_price_data()
-    parse_keystats(sp500_df, stock_df)
+    parse_keystats(sp500_df, stock_df, df_columns)

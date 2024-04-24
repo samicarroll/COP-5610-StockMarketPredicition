@@ -13,7 +13,7 @@ from utils import data_string_to_float
 # ---------------------------------------------------- #
 
 # The path to your fundamental data
-statspath = "/Users/samicarroll/Downloads/intraQuarter/_KeyStats"
+statspath = "intraQuarter/_KeyStats"
 
 # These are the features that will be parsed
 features = [  # Valuation measures
