@@ -32,7 +32,7 @@ for file, stock_data in combined_data.groupby("File"):
     plt.plot(stock_data["Date"], stock_data["Close"], label=file)
 
 plt.xlabel("Date")
-plt.ylabel("Closing Price")
+plt.ylabel("Closing Price (USD)")
 plt.title("Historical Closing Prices of Stocks (Grouped by File)")
 plt.xticks(rotation=45)
 plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
