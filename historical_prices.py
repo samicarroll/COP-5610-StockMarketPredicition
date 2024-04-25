@@ -1,30 +1,41 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load the data from the forward_sample.csv file
-data = pd.read_csv("forward_sample.csv")
+# Initialize an empty list to store data from CSV files
+all_data = []
 
-# Select a specific stock ticker for visualization
-ticker = "AAPL"  # Example: Apple Inc. ticker
+# Iterate over each CSV file in the forward/ directory
+for file in os.listdir("forward/"):
+    if file.endswith(".csv"):
+        # Load data from the current CSV file
+        data = pd.read_csv(os.path.join("forward/", file))
+        # Add a new column with the file name as the label
+        data['File'] = os.path.splitext(file)[0]
+        all_data.append(data)
 
-# Filter the data for the selected stock ticker
-stock_data = data.loc[data["Ticker"] == ticker].copy()
+# Concatenate data from all CSV files into a single DataFrame
+combined_data = pd.concat(all_data)
 
-# Check if the stock_data DataFrame is not empty
-if stock_data.empty:
-    print(f"No data found for {ticker}")
-else:
-    # Convert "Date" column to datetime format if needed
-    stock_data["Date"] = pd.to_datetime(stock_data["Date"])
+# Check if the combined DataFrame is not empty
+if combined_data.empty:
+    print("Error: No data found in the CSV files.")
+    exit()
 
-    # Plot the historical closing price of the selected stock
-    plt.figure(figsize=(10, 6))
-    plt.plot(stock_data["Date"], stock_data["Price"], label="Closing Price")
-    plt.xlabel("Date")
-    plt.ylabel("Price")
-    plt.title(f"Historical Closing Price of {ticker}")
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-    plt.show()
+# Convert "Date" column to datetime format if needed
+if "Date" in combined_data.columns:
+    combined_data["Date"] = pd.to_datetime(combined_data["Date"])
+
+# Plot the historical closing price of all stocks
+plt.figure(figsize=(10, 6))
+for file, stock_data in combined_data.groupby("File"):
+    plt.plot(stock_data["Date"], stock_data["Close"], label=file)
+
+plt.xlabel("Date")
+plt.ylabel("Closing Price")
+plt.title("Historical Closing Prices of Stocks (Grouped by File)")
+plt.xticks(rotation=45)
+plt.legend(loc='upper left', bbox_to_anchor=(1, 1))
+plt.grid(True)
+plt.tight_layout()
+plt.show()
