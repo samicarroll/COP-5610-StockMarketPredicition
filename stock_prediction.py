@@ -4,8 +4,9 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.metrics import classification_report
+from sklearn.metrics import classification_report, mean_squared_error
 from utils import status_calc
+import numpy as np
 
 # The percentage by which a stock has to beat the S&P500 to be considered a 'buy'
 OUTPERFORMANCE = 15
@@ -60,6 +61,17 @@ def predict_stocks():
     y_pred = best_clf.predict(X_val)
     print("Validation Report:")
     print(classification_report(y_val, y_pred))
+    
+    # Convert y_val to a NumPy array
+    y_val = np.array(y_val)
+    
+    # Convert boolean arrays to numerical arrays
+    y_val = y_val.astype(int)
+    y_pred = y_pred.astype(int)
+    
+    # Calculate MSE
+    mse = mean_squared_error(y_val, y_pred)
+    print("Mean Squared Error (MSE) on validation set:", mse)
     
     # Initialize an empty list to store predicted tickers
     invest_list = []
