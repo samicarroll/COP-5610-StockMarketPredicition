@@ -2,18 +2,13 @@ import pandas as pd
 import os
 import re
 import time
-import requests
 import numpy as np
 from tqdm import tqdm
+import yfinance as yf  # Importing yfinance for Yahoo Finance API
 from utils import data_string_to_float
 
-# ---------------------------------------------------- #
-# NOTE:
-# - current_data.py runs with no warnings
-# ---------------------------------------------------- #
-
 # The path to your fundamental data
-statspath = "intraQuarter/_KeyStats"
+statspath = "intraQuarter/_KeyStats/"
 
 # These are the features that will be parsed
 features = [  # Valuation measures
@@ -59,7 +54,7 @@ features = [  # Valuation measures
     "Shares Short",
     "Short Ratio",
     "Short % of Float",
-    "Shares Short (prior month",
+    "Shares Short (prior month)",
 ]
 
 
@@ -79,19 +74,18 @@ def check_yahoo():
     if ".DS_Store" in ticker_list:
         ticker_list.remove(".DS_Store")
 
-    for ticker in tqdm(ticker_list, desc="Download progress", unit="tickers"):
+    for ticker in tqdm(ticker_list, desc="Download progress:", unit="tickers"):
         try:
-            link = f"http://finance.yahoo.com/quote/{ticker.upper()}/key-statistics"
-            resp = requests.get(link)
-
-            # Write results to forward/
-            save = f"forward/{ticker}.html"
-            with open(save, "w") as file:
-                file.write(resp.text)
+            # Fetching stock data using Yahoo Finance API
+            data = yf.Ticker(ticker)
+            hist = data.history(period="1mo")  # Fetching 1 month historical data
+            hist.to_html(f"forward/{ticker}.html")
 
         except Exception as e:
             print(f"{ticker}: {str(e)}\n")
-            time.sleep(2)
+            # If the symbol is delisted or not found, continue with the next ticker
+            continue
+        time.sleep(1)  # Add a delay to avoid hitting API rate limits
 
 
 def forward():
@@ -111,7 +105,7 @@ def forward():
         "SP500_p_change",
     ] + features
 
-    df = pd.DataFrame(columns=df_columns)
+    df_list = []
 
     tickerfile_list = os.listdir("forward/")
 
@@ -122,38 +116,44 @@ def forward():
     # This is the actual parsing. This needs to be fixed every time yahoo changes their UI.
     for tickerfile in tqdm(tickerfile_list, desc="Parsing progress:", unit="tickers"):
         ticker = tickerfile.split(".html")[0].upper()
-        source = open(f"forward/{tickerfile}").read()
-        # Remove commas from the html to make parsing easier.
-        source = source.replace(",", "")
 
-        # Regex search for the different variables in the html file, then append to value_list
+        try:
+            # Fetching stock data using Yahoo Finance API
+            data = yf.Ticker(ticker)
+            hist = data.history(period="1mo")  # Fetching 1 month historical data
+        except Exception as e:
+            print(f"{ticker}: {str(e)}\n")
+            # If the symbol is delisted or not found, continue with the next ticker
+            continue
+
+        # If no price data is found, skip this ticker
+        if hist.empty:
+            print(f"{ticker}: No price data found, symbol may be delisted\n")
+            continue
+
+        # Initialize values list to store feature values
         value_list = []
+
+        # Iterate through each feature and fetch its value from the Yahoo Finance API
         for variable in features:
             try:
-                # Basically, look for the first number present after we an occurence of the variable
-                regex = (
-                    r">"
-                    + re.escape(variable)
-                    + r".*?(\-?\d+\.*\d*K?M?B?|N/A[\\n|\s]*|>0|NaN)%?"
-                    r"(</td>|</span>)"
-                )
-                value = re.search(regex, source, flags=re.DOTALL).group(1)
+                value = hist[variable].iloc[0]  # Fetch value for the feature from historical data
 
                 # Dealing with number formatting
                 value_list.append(data_string_to_float(value))
 
             # The data may not be present. Process accordingly.
-            except AttributeError:
+            except KeyError:
                 value_list.append("N/A")
                 # print(ticker, variable)
 
         # Append the ticker and the features to the dataframe
         new_df_row = [0, 0, ticker, 0, 0, 0, 0] + value_list
 
-        df = df.append(dict(zip(df_columns, new_df_row)), ignore_index=True)
+        df_list.append(new_df_row)
 
+    df = pd.DataFrame(df_list, columns=df_columns)
     return df.replace("N/A", np.nan)
-
 
 if __name__ == "__main__":
     check_yahoo()

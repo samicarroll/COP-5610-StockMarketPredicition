@@ -2,15 +2,8 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from utils import data_string_to_float, status_calc
 
-# ---------------------------------------------------- #
-# TODO: FIX BUILD ERRORS (python3 stock_predictions.py)
-# ValueError: Found array with 0 sample(s) (shape=(0, 41)) while a minimum of 1 is required by RandomForestClassifier.
-# NOTE:
-# 
-# ---------------------------------------------------- #
-
 # The percentage by which a stock has to beat the S&P500 to be considered a 'buy'
-OUTPERFORMANCE = 10
+OUTPERFORMANCE = 50
 
 
 def build_data_set():
@@ -57,7 +50,8 @@ def predict_stocks():
         print(
             f"{len(invest_list)} stocks predicted to outperform the S&P500 by more than {OUTPERFORMANCE}%:"
         )
-        print(" ".join(invest_list))
+        
+        print("\n".join(invest_list))
         return invest_list
 
 
