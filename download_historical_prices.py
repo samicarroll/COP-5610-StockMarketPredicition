@@ -1,9 +1,6 @@
 import os
-from pandas_datareader import data as pdr
 import pandas as pd
 import yfinance as yf
-
-yf.pdr_override()
 
 START_DATE = "2003-08-01"
 END_DATE = "2015-01-01"
@@ -23,9 +20,8 @@ def build_stock_dataset(start=START_DATE, end=END_DATE):
         os.remove(f"{statspath}/.DS_Store")
         ticker_list.remove(".DS_Store")
 
-    # Get all Adjusted Close prices for all the tickers in our list,
-    # between START_DATE and END_DATE
-    all_data = pdr.get_data_yahoo(ticker_list, start, end)
+    # Fetch data for all tickers in ticker_list
+    all_data = yf.download(tickers=ticker_list, start=start, end=end)
     stock_data = all_data["Adj Close"]
 
     # Remove any columns that hold no data, and print their tickers.
@@ -35,7 +31,7 @@ def build_stock_dataset(start=START_DATE, end=END_DATE):
     ]
     print(f"{len(missing_tickers)} tickers are missing: \n {missing_tickers} ")
     # If there are only some missing datapoints, forward fill.
-    stock_data.ffill(inplace=True)
+    stock_data = stock_data.ffill()  # Use .ffill() directly without inplace=True
     stock_data.to_csv("stock_prices.csv")
 
 
@@ -44,7 +40,7 @@ def build_sp500_dataset(start=START_DATE, end=END_DATE):
     Creates the dataset containing S&P500 prices
     :returns: sp500_index.csv
     """
-    index_data = pdr.get_data_yahoo("SPY", start=START_DATE, end=END_DATE)
+    index_data = yf.download(tickers="SPY", start=start, end=end)
     index_data.to_csv("sp500_index.csv")
 
 
@@ -70,7 +66,7 @@ def build_dataset_iteratively(
     for ticker in ticker_list:
         ticker = ticker.upper()
 
-        stock_ohlc = pdr.get_data_yahoo(ticker, start=date_start, end=date_end)
+        stock_ohlc = yf.download(tickers=ticker, start=date_start, end=date_end)
         if stock_ohlc.empty:
             print(f"No data for {ticker}")
             continue

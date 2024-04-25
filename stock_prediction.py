@@ -1,9 +1,14 @@
+import os
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from utils import data_string_to_float, status_calc
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import classification_report
+from utils import status_calc
 
 # The percentage by which a stock has to beat the S&P500 to be considered a 'buy'
-OUTPERFORMANCE = 50
+OUTPERFORMANCE = 15
 
 
 def build_data_set():
@@ -27,34 +32,63 @@ def build_data_set():
 
     return X_train, y_train
 
-
 def predict_stocks():
     X_train, y_train = build_data_set()
-    # Remove the random_state parameter to generate actual predictions
-    clf = RandomForestClassifier(n_estimators=100, random_state=0)
-    clf.fit(X_train, y_train)
+    
+    # Split the data into train and test sets
+    X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.2, random_state=0)
+    
+    # Create a pipeline for scaling and logistic regression
+    pipe = Pipeline([
+        ('scaler', StandardScaler()),
+        ('classifier', LogisticRegression(max_iter=1000, random_state=0))
+    ])
+    
+    # Define hyperparameters grid
+    param_grid = {
+        'classifier__C': [0.001, 0.01, 0.1, 1, 10, 100, 1000]
+    }
+    
+    # Perform grid search for hyperparameter tuning
+    grid_search = GridSearchCV(pipe, param_grid, cv=5, scoring='accuracy')
+    grid_search.fit(X_train, y_train)
+    
+    # Get the best classifier from grid search
+    best_clf = grid_search.best_estimator_
+    
+    # Evaluate the model on the validation set
+    y_pred = best_clf.predict(X_val)
+    print("Validation Report:")
+    print(classification_report(y_val, y_pred))
+    
+    # Initialize an empty list to store predicted tickers
+    invest_list = []
+    
+    # Iterate over each CSV file in the directory
+    for file in os.listdir("forward/"):
+        if file.endswith(".csv"):
+            data = pd.read_csv(os.path.join("forward/", file), index_col="Date")
+            data.dropna(axis=0, how="any", inplace=True)
+            # Check if "Ticker" column exists in the DataFrame
+            if "Ticker" in data.columns:
+                features = data.columns[6:]
+                X_test = data[features].values
+                z = data["Ticker"].values
 
-    # Now we get the actual data from which we want to generate predictions.
-    data = pd.read_csv("forward_sample.csv", index_col="Date")
-    data.dropna(axis=0, how="any", inplace=True)
-    features = data.columns[6:]
-    X_test = data[features].values
-    z = data["Ticker"].values
+                # Get the predicted tickers
+                y_pred = best_clf.predict(X_test)
+                if sum(y_pred) != 0:
+                    invest_list.extend(z[y_pred].tolist())
 
-    # Get the predicted tickers
-    y_pred = clf.predict(X_test)
-    if sum(y_pred) == 0:
+    if len(invest_list) == 0:
         print("No stocks predicted!")
     else:
-        invest_list = z[y_pred].tolist()
         print(
             f"{len(invest_list)} stocks predicted to outperform the S&P500 by more than {OUTPERFORMANCE}%:"
         )
-        
         print("\n".join(invest_list))
         return invest_list
-
-
+    
 if __name__ == "__main__":
     print("Building dataset and predicting stocks...")
     predict_stocks()
